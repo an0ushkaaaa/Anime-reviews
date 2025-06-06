@@ -3,6 +3,8 @@ import requests
 import time
 import re
 from transformers import pipeline
+import os
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
