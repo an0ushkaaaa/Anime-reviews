@@ -1,5 +1,5 @@
 streamlit
 transformers
-torch
-sentencepiece
+torch==2.0.1+cpu --find-links https://download.pytorch.org/whl/torch_stable.html
 requests
+sentencepiece==0.1.99
