@@ -58,7 +58,11 @@ sentiment_pipeline = pipeline(
     revision="714eb0f"
 )
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-reflector = pipeline("text2text-generation", model="google/flan-t5-base", device=-1)
+reflector = pipeline(
+    "text-generation",
+    model="meta-llama/Llama-2-7b-chat-hf",
+    device=-1  # or device=0 if you have a GPU
+)
 
 def summarize_reviews(reviews, label="positive"):
     # Filter and clean reviews by sentiment label
@@ -75,10 +79,9 @@ def summarize_reviews(reviews, label="positive"):
 def reflect_on_summary(summary_text, sentiment_label):
     if not summary_text:
         return f"No {sentiment_label} reviews available to reflect on."
-
-    prompt = f"Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text}"
-    reflection = reflector(prompt, max_length=150, do_sample=True, temperature=0.7)[0]["generated_text"]
-    return reflection
+    prompt = f"<s>[INST] Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text} [/INST]</s>"
+    output = reflector(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)
+    return output[0]["generated_text"]
 
 # --------- Streamlit UI ---------
 st.set_page_config(page_title="✨ Anime Review Summarizer & Reflector", layout="centered")
