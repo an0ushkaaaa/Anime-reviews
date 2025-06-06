@@ -6,6 +6,9 @@ from transformers import pipeline
 import os
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
+API_URL = "https://api-inference.huggingface.co/models/deepseek-ai/deepseek-llm-7b-chat"
+headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
     query = anime_title.replace(" ", "+")
@@ -51,37 +54,46 @@ def chunk_reviews(reviews, chunk_size=3):
         chunks.append(chunk[:1024])  # max chunk size limit
     return chunks
 
+def query_deepseek(prompt):
+    payload = {"inputs": prompt}
+    response = requests.post(API_URL, headers=headers, json=payload)
+    if response.status_code == 200:
+        result = response.json()
+        if isinstance(result, list) and len(result) > 0:
+            return result[0].get("generated_text", "")
+        elif isinstance(result, dict):
+            return result.get("generated_text", "")
+    else:
+        st.error(f"Deepseek API request failed with status code {response.status_code}")
+    return ""
+
 # --------- Transformers Pipelines ---------
 sentiment_pipeline = pipeline(
     "sentiment-analysis",
     model="distilbert/distilbert-base-uncased-finetuned-sst-2-english",
     revision="714eb0f"
 )
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-reflector = pipeline(
-    "text-generation",
-    model="meta-llama/Llama-2-7b-chat-hf",
-    device=-1  # or device=0 if you have a GPU
-)
 
 def summarize_reviews(reviews, label="positive"):
-    # Filter and clean reviews by sentiment label
-    labeled = [r["review"] for r in reviews if r["sentiment_label"] == label]
+    labeled = [r["review"] for r in reviews if r.get("sentiment_label") == label]
     cleaned = [clean_review(r) for r in labeled if len(r) > 30]
     chunks = chunk_reviews(cleaned)
-    
-    summaries = [
-        summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
-        for chunk in chunks[:3]
-    ]
+
+    summaries = []
+    for chunk in chunks[:3]:
+        prompt = f"Summarize the following text:\n{chunk}"
+        summary = query_deepseek(prompt)
+        if summary:
+            summaries.append(summary)
     return "\n\n".join(summaries) if summaries else None
 
 def reflect_on_summary(summary_text, sentiment_label):
     if not summary_text:
         return f"No {sentiment_label} reviews available to reflect on."
-    prompt = f"<s>[INST] Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text} [/INST]</s>"
-    output = reflector(prompt, max_new_tokens=150, do_sample=True, temperature=0.7)
-    return output[0]["generated_text"]
+
+    prompt = f"Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text}"
+    reflection = query_deepseek(prompt)
+    return reflection
 
 # --------- Streamlit UI ---------
 st.set_page_config(page_title="✨ Anime Review Summarizer & Reflector", layout="centered")
@@ -118,4 +130,3 @@ if st.button("Fetch, Summarize & Reflect 💬"):
 
                 st.subheader("💢 Reflection on Negative Reviews")
                 st.write(neg_reflection)
-
