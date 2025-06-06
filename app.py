@@ -13,9 +13,8 @@ import re
 from transformers import pipeline
 from openai import OpenAI
 
-
-# Initialize OpenAI client
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# Directly pass the API key string here (replace with your actual key)
+client = OpenAI(api_key="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")
 
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
