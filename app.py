@@ -56,7 +56,7 @@ sentiment_pipeline = pipeline(
     revision="714eb0f"
 )
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-reflector = pipeline("text2text-generation", model="google/flan-t5-large")
+reflector = pipeline("text2text-generation", model="google/flan-t5-base", device=-1)
 
 def summarize_reviews(reviews, label="positive"):
     # Filter and clean reviews by sentiment label
