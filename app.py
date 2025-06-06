@@ -50,8 +50,15 @@ def chunk_reviews(reviews, chunk_size=3):
     return chunks
 
 # --------- Transformers Pipelines ---------
-sentiment_pipeline = pipeline("sentiment-analysis")
-summarizer = pipeline("summarization", model="google/pegasus-xsum")
+sentiment_pipeline = pipeline(
+    "sentiment-analysis",
+    model="distilbert/distilbert-base-uncased-finetuned-sst-2-english",
+    revision="714eb0f"
+)
+summarizer = pipeline(
+    "summarization",
+    model="sshleifer/distilbart-cnn-12-6"
+)
 reflector = pipeline("text2text-generation", model="google/flan-t5-large")
 
 def summarize_reviews(reviews, label="positive"):
