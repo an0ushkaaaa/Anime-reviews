@@ -7,7 +7,7 @@ import os
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 API_URL = "https://api-inference.huggingface.co/models/deepseek-ai/deepseek-llm-7b-chat"
-headers = {"Authorization": f"Bearer {st.secrets['HF_TOKEN']}"}
+headers = {"Authorization": "Bearer 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"}
 
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
