@@ -1,3 +1,8 @@
+# Requirements (put these in requirements.txt):
+# streamlit
+# requests
+# transformers
+# openai>=1.0.0
 import os
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
@@ -6,10 +11,11 @@ import requests
 import time
 import re
 from transformers import pipeline
-import openai
+from openai import OpenAI
 
-# Load OpenAI API key from secrets or env
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+# Initialize OpenAI client
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
@@ -53,7 +59,7 @@ def chunk_reviews(reviews, chunk_size=3):
     chunks = []
     for i in range(0, len(reviews), chunk_size):
         chunk = " ".join(reviews[i:i + chunk_size])
-        chunks.append(chunk[:1024])  # max chunk size limit
+        chunks.append(chunk[:1024])
     return chunks
 
 # --------- Transformers Pipelines ---------
@@ -65,35 +71,29 @@ sentiment_pipeline = pipeline(
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
 def summarize_reviews(reviews, label="positive"):
-    # Filter and clean reviews by sentiment label
     labeled = [r["review"] for r in reviews if r["sentiment_label"] == label]
     cleaned = [clean_review(r) for r in labeled if len(r) > 30]
     chunks = chunk_reviews(cleaned)
-    
     summaries = [
         summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
         for chunk in chunks[:3]
     ]
     return "\n\n".join(summaries) if summaries else None
 
-def reflect_on_summary_openai(summary_text, sentiment_label):
+def reflect_on_summary(summary_text, sentiment_label):
     if not summary_text:
         return f"No {sentiment_label} reviews available to reflect on."
 
-    prompt = f"Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text}"
-
-    response = openai.ChatCompletion.create(
-        model="gpt-4o-mini",  # or "gpt-3.5-turbo", "gpt-4" if you have access
-        messages=[
-            {"role": "system", "content": "You are a thoughtful and insightful assistant."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=150,
-        temperature=0.7,
-    )
-
-    reflection = response.choices[0].message.content.strip()
-    return reflection
+    prompt = f"Reflect on this {sentiment_label} anime review summary:\n\n{summary_text}"
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"OpenAI request failed: {e}"
 
 # --------- Streamlit UI ---------
 st.set_page_config(page_title="✨ Anime Review Summarizer & Reflector", layout="centered")
@@ -107,24 +107,20 @@ if st.button("Fetch, Summarize & Reflect 💬"):
         if not anime_id:
             st.error("Anime not found. Please check the title and try again.")
         else:
-            reviews = get_reviews(anime_id, pages=5)  # now fetching 5 pages
+            reviews = get_reviews(anime_id, pages=5)
             if not reviews:
                 st.warning("No reviews found for this anime.")
             else:
-                # Analyze sentiment for each review
                 for r in reviews:
                     result = sentiment_pipeline(r["review"][:512])[0]
                     r["sentiment_label"] = result["label"].lower()
 
-                # Summarize positive and negative reviews
                 pos_summary = summarize_reviews(reviews, label="positive")
                 neg_summary = summarize_reviews(reviews, label="negative")
 
-                # Reflect on summaries with OpenAI API
-                pos_reflection = reflect_on_summary_openai(pos_summary, "positive")
-                neg_reflection = reflect_on_summary_openai(neg_summary, "negative")
+                pos_reflection = reflect_on_summary(pos_summary, "positive")
+                neg_reflection = reflect_on_summary(neg_summary, "negative")
 
-                # Display results
                 st.subheader("💖 Reflection on Positive Reviews")
                 st.write(pos_reflection)
 
