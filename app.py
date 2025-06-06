@@ -1,10 +1,10 @@
+import streamlit as st
 import requests
 import time
 import re
-from transformers import pipeline, AutoTokenizer, AutoModelForSeq2SeqLM
-import streamlit as st
+from transformers import pipeline
 
-# ----- Data fetching -----
+# --------- Helper Functions ---------
 def get_anime_id(anime_title):
     query = anime_title.replace(" ", "+")
     url = f"https://api.jikan.moe/v4/anime?q={query}&limit=1"
@@ -33,20 +33,10 @@ def get_reviews(anime_id, pages=3, filter_spoilers=True):
                         "review": review_text
                     })
         else:
-            print(f"Failed to fetch page {page}")
+            print(f"Failed to fetch page {page}, status code: {response.status_code}")
         time.sleep(1)
     return reviews
 
-# ----- Sentiment analysis -----
-sentiment_pipeline = pipeline("sentiment-analysis")
-
-def label_sentiments(reviews):
-    for r in reviews:
-        result = sentiment_pipeline(r["review"][:512])[0]
-        r["sentiment_label"] = result["label"].lower()
-    return reviews
-
-# ----- Cleaning and chunking -----
 def clean_review(text):
     text = re.sub(r"http\S+", "", text)
     text = re.sub(r"[^a-zA-Z0-9.,!? ]+", "", text)
@@ -59,62 +49,48 @@ def chunk_reviews(reviews, chunk_size=3):
         chunks.append(chunk[:1024])
     return chunks
 
-# ----- Summarization -----
+# --------- Transformers Pipelines ---------
+sentiment_pipeline = pipeline("sentiment-analysis")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 
-def summarize_chunks(chunks):
-    summaries = [summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
-                 for chunk in chunks[:3]]
-    return summaries
+def summarize_reviews(reviews, label="positive"):
+    # Filter and clean reviews
+    labeled = [r["review"] for r in reviews if r["sentiment_label"] == label]
+    cleaned = [clean_review(r) for r in labeled if len(r) > 30]
+    chunks = chunk_reviews(cleaned)
+    
+    # Summarize a few chunks
+    summaries = [
+        summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
+        for chunk in chunks[:3]
+    ]
+    return "\n\n".join(summaries) if summaries else "Not enough data."
 
-# ----- Paraphrasing -----
-tokenizer = AutoTokenizer.from_pretrained("Vamsi/T5_Paraphrase_Paws")
-model = AutoModelForSeq2SeqLM.from_pretrained("Vamsi/T5_Paraphrase_Paws")
-
-def rephrase_text(text):
-    input_text = f"paraphrase: {text} </s>"
-    encoding = tokenizer.encode_plus(input_text, padding=True, return_tensors="pt")
-    outputs = model.generate(
-        **encoding,
-        max_length=256,
-        num_beams=5,
-        num_return_sequences=1,
-        temperature=1.5,
-    )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
-
+# --------- Streamlit UI ---------
 st.set_page_config(page_title="✨ Anime Review Summarizer", layout="centered")
 st.title("🌸 Anime Review Summarizer")
 
 anime_title = st.text_input("Enter Anime Title 🎥", "Naruto")
 
 if st.button("Fetch and Summarize Reviews 💬"):
-    with st.spinner("Fetching reviews and analyzing..."):
+    with st.spinner("Fetching and analyzing reviews..."):
         anime_id = get_anime_id(anime_title)
-        if anime_id is None:
-            st.error(f"Could not find anime titled '{anime_title}'")
+        if not anime_id:
+            st.error("Anime not found. Please check the title and try again.")
         else:
             reviews = get_reviews(anime_id, pages=3)
-            reviews = label_sentiments(reviews)
+            for r in reviews:
+                result = sentiment_pipeline(r["review"][:512])[0]
+                r["sentiment_label"] = result["label"].lower()
 
-            positive_reviews = [r["review"] for r in reviews if r["sentiment_label"] == "positive"]
-            negative_reviews = [r["review"] for r in reviews if r["sentiment_label"] == "negative"]
+            # Summarize
+            pos_summary = summarize_reviews(reviews, label="positive")
+            neg_summary = summarize_reviews(reviews, label="negative")
 
-            cleaned_positive = [clean_review(r) for r in positive_reviews if len(r) > 30]
-            cleaned_negative = [clean_review(r) for r in negative_reviews if len(r) > 30]
+            # Display
+            st.subheader("💖 Positive Summary")
+            st.write(pos_summary)
 
-            positive_chunks = chunk_reviews(cleaned_positive)
-            negative_chunks = chunk_reviews(cleaned_negative)
-
-            positive_summaries = summarize_chunks(positive_chunks)
-            negative_summaries = summarize_chunks(negative_chunks)
-
-            polished_positive = rephrase_text(" ".join(positive_summaries))
-            polished_negative = rephrase_text(" ".join(negative_summaries))
-
-            st.subheader("🟢 Positive Summary")
-            st.write(polished_positive)
-
-            st.subheader("🔴 Negative Summary")
-            st.write(polished_negative)
+            st.subheader("💢 Negative Summary")
+            st.write(neg_summary)
 
