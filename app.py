@@ -14,7 +14,7 @@ from transformers import pipeline
 from openai import OpenAI
 
 # Directly pass the API key string here (replace with your actual key)
-client = OpenAI(api_key="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")
+client = OpenAI(api_key="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")
 
 # --------- Helper Functions ---------
 def get_anime_id(anime_title):
