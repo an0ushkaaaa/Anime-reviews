@@ -55,7 +55,7 @@ sentiment_pipeline = pipeline(
     model="distilbert/distilbert-base-uncased-finetuned-sst-2-english",
     revision="714eb0f"
 )
-summarizer = pipeline("summarization", model="google/pegasus-xsum")
+summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
 reflector = pipeline("text2text-generation", model="google/flan-t5-large")
 
 def summarize_reviews(reviews, label="positive"):
