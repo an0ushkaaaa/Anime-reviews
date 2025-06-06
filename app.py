@@ -52,19 +52,26 @@ def chunk_reviews(reviews, chunk_size=3):
 # --------- Transformers Pipelines ---------
 sentiment_pipeline = pipeline("sentiment-analysis")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+reflection_generator = pipeline("text2text-generation", model="facebook/bart-large-cnn")
 
 def summarize_reviews(reviews, label="positive"):
-    # Filter and clean reviews
     labeled = [r["review"] for r in reviews if r["sentiment_label"] == label]
     cleaned = [clean_review(r) for r in labeled if len(r) > 30]
     chunks = chunk_reviews(cleaned)
     
-    # Summarize a few chunks
     summaries = [
         summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
         for chunk in chunks[:3]
     ]
     return "\n\n".join(summaries) if summaries else "Not enough data."
+
+def generate_reflection(summary_text):
+    prompt = (
+        "Based on the following summary, what can a user perceive from this anime? "
+        f"\n\nSummary:\n{summary_text}"
+    )
+    result = reflection_generator(prompt, max_length=150, do_sample=True, temperature=0.7)
+    return result[0]["generated_text"]
 
 # --------- Streamlit UI ---------
 st.set_page_config(page_title="✨ Anime Review Summarizer", layout="centered")
@@ -83,14 +90,14 @@ if st.button("Fetch and Summarize Reviews 💬"):
                 result = sentiment_pipeline(r["review"][:512])[0]
                 r["sentiment_label"] = result["label"].lower()
 
-            # Summarize
             pos_summary = summarize_reviews(reviews, label="positive")
             neg_summary = summarize_reviews(reviews, label="negative")
 
-            # Display
-            st.subheader("💖 Positive Summary")
-            st.write(pos_summary)
+            pos_reflection = generate_reflection(pos_summary)
+            neg_reflection = generate_reflection(neg_summary)
 
-            st.subheader("💢 Negative Summary")
-            st.write(neg_summary)
+            st.subheader("💖 User Perception from Positive Reviews")
+            st.write(pos_reflection)
 
+            st.subheader("💢 User Perception from Negative Reviews")
+            st.write(neg_reflection)
