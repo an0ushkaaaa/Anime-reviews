@@ -15,7 +15,7 @@ def get_anime_id(anime_title):
             return data[0]["mal_id"]
     return None
 
-def get_reviews(anime_id, pages=3, filter_spoilers=True):
+def get_reviews(anime_id, pages=5, filter_spoilers=True):
     reviews = []
     for page in range(1, pages + 1):
         url = f"https://api.jikan.moe/v4/anime/{anime_id}/reviews?page={page}"
@@ -46,50 +46,67 @@ def chunk_reviews(reviews, chunk_size=3):
     chunks = []
     for i in range(0, len(reviews), chunk_size):
         chunk = " ".join(reviews[i:i + chunk_size])
-        chunks.append(chunk[:1024])
+        chunks.append(chunk[:1024])  # max chunk size limit
     return chunks
 
 # --------- Transformers Pipelines ---------
 sentiment_pipeline = pipeline("sentiment-analysis")
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+reflector = pipeline("text2text-generation", model="google/flan-t5-large")
 
 def summarize_reviews(reviews, label="positive"):
-    # Filter and clean reviews
+    # Filter and clean reviews by sentiment label
     labeled = [r["review"] for r in reviews if r["sentiment_label"] == label]
     cleaned = [clean_review(r) for r in labeled if len(r) > 30]
     chunks = chunk_reviews(cleaned)
     
-    # Summarize a few chunks
     summaries = [
         summarizer(chunk, max_length=80, min_length=30, do_sample=False)[0]["summary_text"]
         for chunk in chunks[:3]
     ]
-    return "\n\n".join(summaries) if summaries else "Not enough data."
+    return "\n\n".join(summaries) if summaries else None
+
+def reflect_on_summary(summary_text, sentiment_label):
+    if not summary_text:
+        return f"No {sentiment_label} reviews available to reflect on."
+
+    prompt = f"Provide a thoughtful reflection on the following {sentiment_label} summary:\n\n{summary_text}"
+    reflection = reflector(prompt, max_length=150, do_sample=True, temperature=0.7)[0]["generated_text"]
+    return reflection
 
 # --------- Streamlit UI ---------
-st.set_page_config(page_title="✨ Anime Review Summarizer", layout="centered")
-st.title("🌸 Anime Review Summarizer")
+st.set_page_config(page_title="✨ Anime Review Summarizer & Reflector", layout="centered")
+st.title("🌸 Anime Review Summarizer & Reflector")
 
 anime_title = st.text_input("Enter Anime Title 🎥", "Naruto")
 
-if st.button("Fetch and Summarize Reviews 💬"):
+if st.button("Fetch, Summarize & Reflect 💬"):
     with st.spinner("Fetching and analyzing reviews..."):
         anime_id = get_anime_id(anime_title)
         if not anime_id:
             st.error("Anime not found. Please check the title and try again.")
         else:
             reviews = get_reviews(anime_id, pages=3)
-            for r in reviews:
-                result = sentiment_pipeline(r["review"][:512])[0]
-                r["sentiment_label"] = result["label"].lower()
+            if not reviews:
+                st.warning("No reviews found for this anime.")
+            else:
+                # Analyze sentiment for each review
+                for r in reviews:
+                    result = sentiment_pipeline(r["review"][:512])[0]
+                    r["sentiment_label"] = result["label"].lower()
 
-            # Summarize
-            pos_summary = summarize_reviews(reviews, label="positive")
-            neg_summary = summarize_reviews(reviews, label="negative")
+                # Summarize positive and negative reviews
+                pos_summary = summarize_reviews(reviews, label="positive")
+                neg_summary = summarize_reviews(reviews, label="negative")
 
-            # Display
-            st.subheader("💖 Positive Summary")
-            st.write(pos_summary)
+                # Reflect on summaries
+                pos_reflection = reflect_on_summary(pos_summary, "positive")
+                neg_reflection = reflect_on_summary(neg_summary, "negative")
 
-            st.subheader("💢 Negative Summary")
-            st.write(neg_summary)
+                # Display results
+                st.subheader("💖 Reflection on Positive Reviews")
+                st.write(pos_reflection)
+
+                st.subheader("💢 Reflection on Negative Reviews")
+                st.write(neg_reflection)
+
