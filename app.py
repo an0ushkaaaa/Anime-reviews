@@ -1,12 +1,12 @@
+import os
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
+
 import streamlit as st
 import requests
 import time
 import re
 from transformers import pipeline
-import os
 import openai
-
-os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 # Load OpenAI API key from secrets or env
 openai.api_key = st.secrets["OPENAI_API_KEY"]
