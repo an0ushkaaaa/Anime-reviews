@@ -21,3 +21,7 @@ ChatGPT was a huge part of this project — not only for generating text within 
 
 That said, I often had to manually adapt and debug the code — especially when differences between environments (like Kaggle vs. Streamlit Cloud) caused unexpected issues. For example, the OpenAI API worked well in Kaggle but responded slowly on Streamlit, prompting me to troubleshoot based on concepts learned during class. These hands-on debugging sessions deepened my understanding of both ML pipelines and deployment nuances.
 
+📸 **Screenshots**
+<img width="1470" alt="Screenshot 2025-06-05 at 6 35 07 PM" src="https://github.com/user-attachments/assets/6cd342dc-457c-4f51-b757-3e1f62cd6107" />
+
+<img width="1470" alt="Screenshot 2025-06-06 at 3 18 26 PM" src="https://github.com/user-attachments/assets/77381d00-af31-429a-b3a8-5c28d2efb158" />
