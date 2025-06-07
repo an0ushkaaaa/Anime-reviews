@@ -2,6 +2,7 @@
 This is a Streamlit web app that fetches anime reviews from the Jikan API (an unofficial MyAnimeList API), summarizes them using OpenAI’s GPT models, and displays concise review summaries for easy consumption.
 
 **👋 How to use it**
+
 Streamlit App Link: https://anime-reviews-79ol5fhwwvpcbnzcoaqwn9.streamlit.app/
 
 1. Enter an anime name
